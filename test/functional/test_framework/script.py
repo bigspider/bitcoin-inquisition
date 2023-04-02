@@ -256,6 +256,10 @@ OP_NOP10 = CScriptOp(0xb9)
 # BIP 342 opcodes (Tapscript)
 OP_CHECKSIGADD = CScriptOp(0xba)
 
+# Contract opcodes
+OP_CHECKINPUTCONTRACTVERIFY = CScriptOp(0xbb)
+OP_CHECKOUTPUTCONTRACTVERIFY = CScriptOp(0xbc)
+
 OP_INVALIDOPCODE = CScriptOp(0xff)
 
 OPCODE_NAMES.update({
@@ -371,6 +375,8 @@ OPCODE_NAMES.update({
     OP_NOP9: 'OP_NOP9',
     OP_NOP10: 'OP_NOP10',
     OP_CHECKSIGADD: 'OP_CHECKSIGADD',
+    OP_CHECKINPUTCONTRACTVERIFY: 'OP_CHECKINPUTCONTRACTVERIFY',
+    OP_CHECKOUTPUTCONTRACTVERIFY: 'OP_CHECKOUTPUTCONTRACTVERIFY',
     OP_INVALIDOPCODE: 'OP_INVALIDOPCODE',
 })
 
@@ -890,8 +896,17 @@ def taproot_tree_helper(scripts):
 # - tweak: the tweak (32 bytes)
 # - leaves: a dict of name -> TaprootLeafInfo objects for all known leaves
 # - merkle_root: the script tree's Merkle root, or bytes() if no leaves are present
-TaprootInfo = namedtuple("TaprootInfo", "scriptPubKey,internal_pubkey,negflag,tweak,leaves,merkle_root,output_pubkey,keyver")
+class TaprootInfo(namedtuple("TaprootInfo", "scriptPubKey,internal_pubkey,negflag,tweak,leaves,merkle_root,output_pubkey,keyver")):
+    def __hash__(self):
+        return hash(str(self))
 
+    def controlblock_for_script_spend(self, script_name: str) -> bytes:
+        leaf = self.leaves[script_name]
+        return (
+            bytes([leaf.version + self.negflag]) +
+            self.internal_pubkey +
+            leaf.merklebranch
+        )
 # A TaprootLeafInfo object has the following fields:
 # - script: the leaf script (CScript or bytes)
 # - version: the leaf version (0xc0 for BIP342 tapscript)
