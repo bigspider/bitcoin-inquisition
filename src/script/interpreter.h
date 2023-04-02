@@ -314,6 +314,11 @@ public:
         return false;
     }
 
+    virtual const std::vector<CTxOut>* GetTxvOut() const
+    {
+        return nullptr;
+    }
+
     virtual ~BaseSignatureChecker() {}
 };
 
@@ -351,6 +356,7 @@ public:
     bool CheckLockTime(const CScriptNum& nLockTime) const override;
     bool CheckSequence(const CScriptNum& nSequence) const override;
     bool CheckDefaultCheckTemplateVerifyHash(const Span<const unsigned char>& hash) const override;
+    const std::vector<CTxOut>* GetTxvOut() const override;
 };
 
 using TransactionSignatureChecker = GenericTransactionSignatureChecker<CTransaction>;

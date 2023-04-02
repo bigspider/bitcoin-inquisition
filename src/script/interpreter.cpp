@@ -1152,6 +1152,85 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                 }
                 break;
 
+                case OP_CHECKINPUTCONTRACTVERIFY:
+                {
+                    // OP_CHECKINPUTCONTRACTVERIFY is only available in Tapscript
+                    if (sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0) return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+
+                    // (x d -- )
+                    if (stack.size() < 2)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    valtype& x = stacktop(-2);
+                    valtype& d = stacktop(-1);
+
+                    if (x.size() != 32 || d.size() != 32)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    const XOnlyPubKey nakedXOnlyKey{Span<const unsigned char>{x.data(), x.data() + 32}};
+                    const uint256 data(d);
+
+                    if (!execdata.m_internal_key.has_value())
+                        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);  // TODO
+
+                    // Verify that tweak(lift_x(x), d) equals the internal pubkey
+                    if (!execdata.m_internal_key.value().CheckDoubleTweak(nakedXOnlyKey, &data, nullptr))
+                        return set_error(serror, SCRIPT_ERR_WRONGCONTRACTDATA);
+
+                    popstack(stack);
+                    popstack(stack);
+                }
+                break;
+
+                case OP_CHECKOUTPUTCONTRACTVERIFY:
+                {
+                    // OP_CHECKOUTPUTCONTRACTVERIFY is only available in Tapscript
+                    if (sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0) return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+
+                    // (out_i x taptree d -- )
+                    if (stack.size() < 4)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    int out_i = CScriptNum(stacktop(-4), fRequireMinimal).getint();
+                    valtype& x = stacktop(-3);
+                    valtype& taptree = stacktop(-2);
+                    valtype& d = stacktop(-1);
+
+                    auto outps = checker.GetTxvOut();
+                    // Return error if the evaluation context is unavailable
+                    if (!outps)
+                        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR); // TODO
+
+                    if (x.size() != 32 || taptree.size() != 32 || (d.size() != 0 && d.size() != 32))
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    if (out_i < 0 || out_i >= (int)outps->size())
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION); // TODO: maybe define a more precise error
+
+                    const XOnlyPubKey nakedXOnlyKey{Span<const unsigned char>{x.data(), x.data() + 32}};
+
+                    const uint256 data(d);
+                    const uint256 *data_ptr = (d.size() == 0 ? nullptr : &data);
+
+                    const uint256 merkle_tree(taptree);
+
+                    CScript scriptPubKey = outps->at(out_i).scriptPubKey;
+                    if (scriptPubKey.size() != 1 + 1 + 32 || scriptPubKey[0] != OP_1 || scriptPubKey[1] != 32)
+                        return set_error(serror, SCRIPT_ERR_WRONGCONTRACTDATA);
+
+                    const XOnlyPubKey outputXOnlyKey{Span<const unsigned char>{scriptPubKey.data() + 2, scriptPubKey.data() + 34}};
+
+                    // Verify that taptweak(tweak(lift_x(x), d), taptree) equals the internal pubkey
+                    if (!outputXOnlyKey.CheckDoubleTweak(nakedXOnlyKey, data_ptr, &merkle_tree))
+                        return set_error(serror, SCRIPT_ERR_WRONGCONTRACTDATA);
+
+                    popstack(stack);
+                    popstack(stack);
+                    popstack(stack);
+                    popstack(stack);
+                }
+                break;
+
                 case OP_CHECKMULTISIG:
                 case OP_CHECKMULTISIGVERIFY:
                 {
@@ -1945,6 +2024,12 @@ bool GenericTransactionSignatureChecker<T>::CheckDefaultCheckTemplateVerifyHash(
     } else {
         return HandleMissingData(m_mdb);
     }
+}
+
+template <class T>
+const std::vector<CTxOut>* GenericTransactionSignatureChecker<T>::GetTxvOut() const
+{
+    return &(txTo->vout);
 }
 // explicit instantiation
 template class GenericTransactionSignatureChecker<CTransaction>;

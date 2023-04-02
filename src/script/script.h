@@ -206,6 +206,10 @@ enum opcodetype
     // Opcode added by BIP 342 (Tapscript)
     OP_CHECKSIGADD = 0xba,
 
+    // Opcodes for contracts
+    OP_CHECKINPUTCONTRACTVERIFY = 0xbb,
+    OP_CHECKOUTPUTCONTRACTVERIFY = 0xbc,
+
     OP_INVALIDOPCODE = 0xff,
 };
 

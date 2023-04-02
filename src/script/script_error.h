@@ -30,6 +30,7 @@ typedef enum ScriptError_t
     SCRIPT_ERR_CHECKSIGVERIFY,
     SCRIPT_ERR_NUMEQUALVERIFY,
     SCRIPT_ERR_TEMPLATE_MISMATCH,
+    SCRIPT_ERR_WRONGCONTRACTDATA,
 
     /* Logical/Format/Canonical errors */
     SCRIPT_ERR_BAD_OPCODE,
