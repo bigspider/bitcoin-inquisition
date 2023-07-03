@@ -1672,10 +1672,10 @@ bool InitScriptExecutionCache(size_t max_size_bytes)
     return true;
 }
 
-class DeferredCheckError
+struct DeferredCheckError
 {
-public:
-    std::string ToString() { return "deferred-check-error"; }
+    std::string m_code;
+    std::string ToString() { return m_code; }
 };
 
 
