@@ -309,6 +309,7 @@ BASE_SCRIPTS = [
     'feature_includeconf.py',
     'feature_addrman.py',
     'feature_asmap.py',
+    'feature_matt.py',
     'mempool_unbroadcast.py',
     'mempool_compatibility.py',
     'mempool_accept_wtxid.py',
