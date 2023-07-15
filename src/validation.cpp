@@ -1683,7 +1683,23 @@ static std::optional<DeferredCheckError> ValidateDeferredChecks(
     const std::vector<DeferredCheck>& checks,
     const CTransaction& tx)
 {
-    // Perform deferred checks here.
+    std::unordered_map<size_t, CAmount> expected_output_amount;
+
+    for (const auto& c : checks) {
+        if (const auto& recov_check = c.m_aggr_output_amount_check) {
+            expected_output_amount[recov_check->vout_idx] += recov_check->amount;
+        }
+    }
+
+    // Ensure that all inputs with a deferred check on an output have their value
+    // reflected in it.
+    for (const auto& [vout_idx, amount] : expected_output_amount) {
+        if (tx.vout[vout_idx].nValue < amount) {
+            return DeferredCheckError{"ccv-insufficient-output-value"};
+        }
+    }
+
+    // Perform more deferred checks here.
     return std::nullopt;
 }
 

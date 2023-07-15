@@ -30,6 +30,7 @@ typedef enum ScriptError_t
     SCRIPT_ERR_CHECKSIGVERIFY,
     SCRIPT_ERR_NUMEQUALVERIFY,
     SCRIPT_ERR_TEMPLATE_MISMATCH,
+    SCRIPT_ERR_WRONGCONTRACTDATA,
 
     /* Logical/Format/Canonical errors */
     SCRIPT_ERR_BAD_OPCODE,
@@ -83,6 +84,8 @@ typedef enum ScriptError_t
     /* Constant scriptCode */
     SCRIPT_ERR_OP_CODESEPARATOR,
     SCRIPT_ERR_SIG_FINDANDDELETE,
+
+    SCRIPT_ERR_INTROSPECT_CONTEXT_UNAVAILABLE,
 
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;
