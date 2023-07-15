@@ -235,6 +235,20 @@ enum class KeyVersion
     ANYPREVOUT = 1,  //!< 1 or 33 byte public key, first byte is 0x01
 };
 
+struct DeferredAggregateOutputAmountCheck
+{
+    //! The index of the output that should be covering the value of a particular input.
+    unsigned int vout_idx;
+
+    //! An expected constituent amount of the output - note that this isn't the *total*
+    //! expected, but the value required for a specific input.
+    CAmount amount;
+
+    DeferredAggregateOutputAmountCheck(unsigned int vout_idx, CAmount amount) noexcept
+        : vout_idx(vout_idx), amount(amount) {}
+
+};
+
 //! Data that is accumulated during the script verification of a single input and then
 //! used to perform aggregate checks after all inputs have been run through
 //! `VerifyScript()`.
@@ -247,6 +261,8 @@ struct DeferredCheck
     //! deferred checks with their related transaction when a block's worth of
     //! script executions are performed in batch.
     const CTransaction* m_tx_to;
+
+   std::optional<DeferredAggregateOutputAmountCheck> m_aggr_output_amount_check{std::nullopt};
 
     //! Future specific deferred check structs will be added here as pointers.
     //!
@@ -263,6 +279,11 @@ struct ScriptExecutionData
     bool m_tapleaf_hash_init = false;
     //! The tapleaf hash.
     uint256 m_tapleaf_hash;
+
+    //! Whether m_taproot_merkle_root is initialized.
+    bool m_taproot_merkle_root_init = false;
+    //! The merkle root of the taproot tree.
+    uint256 m_taproot_merkle_root;
 
     //! Whether m_codeseparator_pos is initialized.
     bool m_codeseparator_pos_init = false;
@@ -295,9 +316,16 @@ struct ScriptExecutionData
     //! that has created this `ScriptExecutionData` instance.
     std::vector<DeferredCheck>* m_deferred_checks;
 
-    void AppendDeferredCheck(DeferredCheck dc)
+    DeferredCheck& NewDeferredCheck()
     {
-        Assert(m_deferred_checks)->push_back(dc);
+        Assert(m_deferred_checks)->emplace_back();
+        return m_deferred_checks->back();
+    }
+
+    void AddDeferredAggregateOutputAmountCheck(unsigned int vout_idx, CAmount amount)
+    {
+        auto& dc = this->NewDeferredCheck();
+        dc.m_aggr_output_amount_check = {vout_idx, amount};
     }
 };
 
@@ -350,6 +378,11 @@ public:
         return false;
     }
 
+    virtual bool CheckContract(int flags, int index, const std::vector<unsigned char>& pubkey, const std::vector<unsigned char>& data, const std::vector<unsigned char>& taptree, ScriptExecutionData& ScriptExecutionData, ScriptError* serror) const
+    {
+        return false;
+    }
+
     virtual ~BaseSignatureChecker() {}
 };
 
@@ -387,6 +420,7 @@ public:
     bool CheckLockTime(const CScriptNum& nLockTime) const override;
     bool CheckSequence(const CScriptNum& nSequence) const override;
     bool CheckDefaultCheckTemplateVerifyHash(const Span<const unsigned char>& hash) const override;
+    bool CheckContract(int flags, int index, const std::vector<unsigned char>& pubkey, const std::vector<unsigned char>& data, const std::vector<unsigned char>& taptree, ScriptExecutionData& ScriptExecutionData, ScriptError* serror) const override;
 };
 
 using TransactionSignatureChecker = GenericTransactionSignatureChecker<CTransaction>;

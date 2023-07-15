@@ -249,6 +249,47 @@ std::optional<std::pair<XOnlyPubKey, bool>> XOnlyPubKey::CreateTapTweak(const ui
     return ret;
 }
 
+bool XOnlyPubKey::CheckDoubleTweak(const XOnlyPubKey& naked, const uint256* data, const uint256* merkle_root) const
+{
+    int parity;
+
+    secp256k1_xonly_pubkey internal_xonly;
+
+    if (data != nullptr) {
+        secp256k1_xonly_pubkey naked_key;
+        if (!secp256k1_xonly_pubkey_parse(secp256k1_context_verify, &naked_key, naked.data())) return false;
+        secp256k1_pubkey internal;
+        if (!secp256k1_xonly_pubkey_tweak_add(secp256k1_context_verify, &internal, &naked_key, data->begin())) return false;
+        if (!secp256k1_xonly_pubkey_from_pubkey(secp256k1_context_verify, &internal_xonly, &parity, &internal)) return false;
+    } else {
+        // No data tweak; the internal key is the naked key
+        if (!secp256k1_xonly_pubkey_parse(secp256k1_context_verify, &internal_xonly, naked.data())) return false;
+    }
+
+    secp256k1_xonly_pubkey expected_xonly;
+    if (!secp256k1_xonly_pubkey_parse(secp256k1_context_verify, &expected_xonly, m_keydata.data())) return false;
+
+    if (merkle_root != nullptr) {
+        // Compute the second tweak based on merkle_root
+        unsigned char pubkey_bytes[32];
+        secp256k1_xonly_pubkey_serialize(secp256k1_context_verify, pubkey_bytes, &internal_xonly);
+        XOnlyPubKey internal_key = XOnlyPubKey(pubkey_bytes);
+
+        uint256 tweak = internal_key.ComputeTapTweakHash(merkle_root);
+
+        secp256k1_pubkey result;
+        if (!secp256k1_xonly_pubkey_tweak_add(secp256k1_context_verify, &result, &internal_xonly, tweak.begin())) return false;
+
+        secp256k1_xonly_pubkey result_xonly;
+        if (!secp256k1_xonly_pubkey_from_pubkey(secp256k1_context_verify, &result_xonly, &parity, &result)) return false;
+
+        return secp256k1_xonly_pubkey_cmp(secp256k1_context_verify, &result_xonly, &expected_xonly) == 0;
+    } else {
+        // If merkle_root is nullptr, compare internal_xonly with expected_xonly
+        return secp256k1_xonly_pubkey_cmp(secp256k1_context_verify, &internal_xonly, &expected_xonly) == 0;
+    }
+}
+
 
 bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchSig) const {
     if (!IsValid())
