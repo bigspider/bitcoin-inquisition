@@ -480,7 +480,7 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                 }
             }
 
-            if (opcode == OP_CAT ||
+            if ((opcode == OP_CAT && (sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0)) ||
                 opcode == OP_SUBSTR ||
                 opcode == OP_LEFT ||
                 opcode == OP_RIGHT ||
@@ -930,6 +930,26 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                 }
                 break;
 
+                case OP_CAT:
+                {
+                    if (stack.size() < 2)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    valtype vch1 = stacktop(-2);
+                    valtype vch2 = stacktop(-1);
+
+                    if (vch1.size() + vch2.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    valtype vch3;
+                    vch3.reserve(vch1.size() + vch2.size());
+                    vch3.insert(vch3.end(), vch1.begin(), vch1.end());
+                    vch3.insert(vch3.end(), vch2.begin(), vch2.end());
+
+                    popstack(stack);
+                    popstack(stack);
+                    stack.push_back(vch3);
+                }
+                break;
 
                 case OP_SIZE:
                 {
